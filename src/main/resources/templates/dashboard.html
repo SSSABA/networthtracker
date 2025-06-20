@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Net Worth Dashboard</title>
+    <!-- Simple CSS for better layout -->
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .dashboard-container { display: flex; flex-wrap: wrap; gap: 20px; }
+        .kpi-card { padding: 20px; border: 1px solid #ccc; border-radius: 8px; text-align: center; flex-grow: 1; }
+        .chart-card { width: 100%; max-width: 600px; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        .nav-tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid #ccc; }
+        .nav-tabs a { padding: 10px 15px; text-decoration: none; color: #333; }
+        .nav-tabs a.active { border: 1px solid #ccc; border-bottom: none; background-color: #f9f9f9; }
+    </style>
+</head>
+<body>
+<nav style="padding: 10px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; margin-bottom: 20px;">
+    <a href="/" style="text-decoration: none; font-weight: bold; margin-right: 15px;">Dashboard</a>
+    <a href="/categories" style="text-decoration: none;">Manage Categories</a>
+</nav>
+<div class="container">
+    <h1>My Financial Dashboard</h1>
+
+    <div class="nav-tabs">
+        <a href="/" class="active">Dashboard</a>
+        <a href="/networth-input">Net Worth Input</a>
+    </div>
+
+    <div class="dashboard-container">
+        <div class="kpi-card">
+            <h2>Net Worth</h2>
+            <h3 th:text="${#numbers.formatCurrency(netWorth)}"></h3>
+        </div>
+        <div class="kpi-card">
+            <h2>Total Assets</h2>
+            <h3 th:text="${#numbers.formatCurrency(totalAssets)}"></h3>
+        </div>
+        <div class="kpi-card">
+            <h2>Total Liabilities</h2>
+            <h3 th:text="${#numbers.formatCurrency(totalLiabilities)}"></h3>
+        </div>
+    </div>
+
+    <div class="dashboard-container" style="margin-top: 20px;">
+        <div class="chart-card">
+            <h3>Net Worth History</h3>
+            <canvas id="netWorthHistoryChart"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>Asset vs. Liability</h3>
+            <canvas id="assetLiabilityChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Import Chart.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // --- Asset vs. Liability Doughnut Chart ---
+            fetch('/api/dashboard/asset-liability-summary')
+                .then(response => response.json())
+                .then(data => {
+                    const ctx = document.getElementById('assetLiabilityChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label: 'Amount',
+                                data: data.values,
+                                backgroundColor: ['rgb(75, 192, 192)', 'rgb(255, 99, 132)'],
+                                hoverOffset: 4
+                            }]
+                        }
+                    });
+                });
+
+            // --- Net Worth History Line Chart ---
+            fetch('/api/dashboard/networth-history')
+                .then(response => response.json())
+                .then(data => {
+                    const ctx = document.getElementById('netWorthHistoryChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label: 'Net Worth',
+                                data: data.values,
+                                fill: false,
+                                borderColor: 'rgb(54, 162, 235)',
+                                tension: 0.1
+                            }]
+                        }
+                    });
+                });
+        });
+    </script>
+</div>
+</body>
+</html>
