@@ -7,6 +7,8 @@ import java.util.List;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
     List<Transaction> findAllByOrderByDateAsc(); // This finds all transactions and sorts them by date
-
     long countByCategory_Id(Long categoryId);
+
+    @Override
+    <S extends Transaction> List<S> saveAll(Iterable<S> entities);
 }

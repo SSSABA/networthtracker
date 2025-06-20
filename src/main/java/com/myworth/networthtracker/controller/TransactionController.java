@@ -2,6 +2,7 @@ package com.myworth.networthtracker.controller;
 
 import com.myworth.networthtracker.enums.TransactionType;
 import com.myworth.networthtracker.model.Transaction;
+import com.myworth.networthtracker.model.TransactionListWrapper;
 import com.myworth.networthtracker.repository.AccountRepository;
 import com.myworth.networthtracker.repository.CategoryRepository;
 import com.myworth.networthtracker.repository.TransactionRepository;
@@ -11,6 +12,9 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
+
+import java.util.stream.Collectors;
+
 
 @Controller
 public class TransactionController {
@@ -34,21 +38,32 @@ public class TransactionController {
     }
 
     // Handles GET request for /add-transaction page
-    // Prepares all the necessary data for the form's dropdown menus
-    @GetMapping("/add-transaction")
-    public String showAddTransactionForm(Model model) {
-        model.addAttribute("transaction", new Transaction()); // For form binding
+    // This now serves the new multi-entry page
+    @GetMapping("/add-transactions") // Renamed URL for clarity
+    public String showBulkAddTransactionForm(Model model) {
+        TransactionListWrapper wrapper = new TransactionListWrapper();
+        // Start with one empty transaction row
+        wrapper.addTransaction(new Transaction());
+
+        model.addAttribute("formWrapper", wrapper); // Use the wrapper as the model attribute
         model.addAttribute("categories", categoryRepository.findAll());
         model.addAttribute("accounts", accountRepository.findAll());
         model.addAttribute("types", TransactionType.values());
-        return "add-transaction"; // Returns the add-transaction.html view
+        return "add-transactions-bulk"; // Point to a new HTML file
     }
 
     // Handles POST request from the form at /add-transaction
-    // Saves the new transaction and redirects to the dashboard to see the impact
-    @PostMapping("/add-transaction")
-    public String addTransaction(@ModelAttribute("transaction") Transaction transaction) {
-        transactionRepository.save(transaction);
-        return "redirect:/"; // Redirect to the dashboard page
+    // MODIFIED: This now saves a list of transactions
+    @PostMapping("/add-transactions") // Renamed URL for clarity
+    public String saveBulkTransactions(@ModelAttribute TransactionListWrapper formWrapper) {
+        // Filter out any empty/incomplete rows that might have been submitted
+        var transactionsToSave = formWrapper.getTransactions().stream()
+                .filter(t -> t.getAmount() != null && t.getCategory() != null && t.getAccount() != null)
+                .collect(Collectors.toList());
+
+        if (!transactionsToSave.isEmpty()) {
+            transactionRepository.saveAll(transactionsToSave);
+        }
+        return "redirect:/transactions"; // Redirect to the transaction list to see them all
     }
 }
