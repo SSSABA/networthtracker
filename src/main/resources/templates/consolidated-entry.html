@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Consolidated Data Entry</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        .nav-bar { display: flex; gap: 15px; padding: 10px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; margin-bottom: 2em; }
+        .nav-bar a { text-decoration: none; font-weight: bold; color: #007bff; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th, td { border: 1px solid #ccc; padding: 4px; text-align: center; }
+        thead th { background-color: #f2f2f2; position: sticky; top: 0; z-index: 1;}
+        .parent-header { background-color: #e9ecef; }
+        input[type=date] { width: 130px; }
+        input[type=number] { width: 90%; text-align: right; }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+        .btn { padding: 8px 12px; border-radius: 5px; border: none; cursor: pointer; color: white; margin-top: 1em;}
+        .btn-add-row { background-color: #17a2b8; }
+        .btn-save-all { background-color: #28a745; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+
+<nav class="nav-bar">
+    <a th:href="@{/}">Dashboard</a>
+    <a th:href="@{/transactions}">View Transactions</a>
+    <a th:href="@{/consolidated-entry}" style="color: #28a745;">Consolidated Entry</a>
+    <a th:href="@{/categories}">Manage Categories</a>
+</nav>
+
+<h1>Consolidated Data Entry</h1>
+
+<form th:action="@{/consolidated-entry}" th:object="${formWrapper}" method="post">
+    <table>
+        <thead>
+        <tr>
+            <th rowspan="2">Date</th>
+            <!-- THIS IS THE LINE THAT IS FIXED -->
+            <!-- Use #sets.size() for a Set, and only render the header if there are subcategories -->
+            <th th:each="parent : ${parentCategories}" th:if="${not #sets.isEmpty(parent.subCategories)}" th:colspan="${#sets.size(parent.subCategories)}" class="parent-header" th:text="${parent.name}"></th>
+        </tr>
+        <tr>
+            <th:block th:each="parent : ${parentCategories}">
+                <th th:each="child : ${parent.subCategories}" th:text="${child.name}"></th>
+            </th:block>
+        </tr>
+        </thead>
+        <tbody id="entry-tbody">
+        <tr th:each="entry, rowStat : *{dailyEntries}">
+            <td>
+                <input type="date" th:field="*{dailyEntries[__${rowStat.index}__].date}" required>
+            </td>
+            <th:block th:each="parent : ${parentCategories}">
+                <!-- Only render the input cell if the parent has subcategories -->
+                <td th:each="child : ${parent.subCategories}">
+                    <input type="number" step="0.01" th:field="*{dailyEntries[__${rowStat.index}__].amounts[__${child.id}__]}" placeholder="0.00">
+                </td>
+            </th:block>
+        </tr>
+        </tbody>
+    </table>
+    <button type="button" id="addRowBtn" class="btn btn-add-row">Add Date Row</button>
+    <hr>
+    <button type="submit" class="btn btn-save-all">Save All Entries</button>
+</form>
+
+<!-- Template Row for JavaScript -->
+<table style="display: none;">
+    <tbody id="template-tbody">
+    <tr>
+        <td><input type="date" name="dailyEntries[0].date" required></td>
+        <th:block th:each="parent : ${parentCategories}">
+            <td th:each="child : ${parent.subCategories}">
+                <input type="number" step="0.01" th:name="'dailyEntries[0].amounts[' + ${child.id} + ']'" placeholder="0.00">
+            </td>
+        </th:block>
+    </tr>
+    </tbody>
+</table>
+
+<script>
+    document.getElementById('addRowBtn').addEventListener('click', function() {
+        const tableBody = document.getElementById('entry-tbody');
+        const newRow = document.getElementById('template-tbody').querySelector('tr').cloneNode(true);
+        const newIndex = tableBody.rows.length;
+
+        newRow.querySelectorAll('[name]').forEach(el => {
+            el.name = el.name.replace(/\[\d+\]/, '[' + newIndex + ']');
+        });
+
+        tableBody.appendChild(newRow);
+    });
+</script>
+
+</body>
+</html>

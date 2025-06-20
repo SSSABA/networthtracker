@@ -1,57 +1,81 @@
 package com.myworth.networthtracker.controller;
 
+import com.myworth.networthtracker.enums.TransactionType;
 import com.myworth.networthtracker.model.Category;
+import com.myworth.networthtracker.repository.AccountRepository;
 import com.myworth.networthtracker.repository.CategoryRepository;
 import com.myworth.networthtracker.repository.TransactionRepository;
+import com.myworth.networthtracker.service.CategoryService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
 
 @Controller
+@RequestMapping("/categories")
 public class CategoryController {
 
-    private final CategoryRepository categoryRepository;
+    private final CategoryRepository categoryRepository; // Keep for write operations
+    private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
+    private final CategoryService categoryService; // <-- INJECT THE NEW SERVICE
 
-    public CategoryController(CategoryRepository categoryRepository, TransactionRepository transactionRepository) {
+    public CategoryController(CategoryRepository categoryRepository, AccountRepository accountRepository, TransactionRepository transactionRepository, CategoryService categoryService) {
         this.categoryRepository = categoryRepository;
+        this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
+        this.categoryService = categoryService;
     }
 
-    // This method displays the main categories page
-    @GetMapping("/categories")
+    @GetMapping
     public String listCategories(Model model) {
-        List<Category> categories = categoryRepository.findAll();
-        model.addAttribute("categories", categories);
-        // This is for the "Add New Category" form
-        model.addAttribute("newCategory", new Category());
-        return "categories"; // Renders categories.html
-    }
+        // USE THE SERVICE to get fully loaded data
+        List<Category> parentCategories = categoryService.getParentCategoriesWithSubcategories();
+        model.addAttribute("parentCategories", parentCategories);
 
-    // This method handles the form submission for adding a new category
-    @PostMapping("/categories/add")
-    public String addCategory(@ModelAttribute Category newCategory) {
-        categoryRepository.save(newCategory);
-        return "redirect:/categories"; // Redirect to refresh the page and list
-    }
-
-    // This method handles the deletion of a category
-    @PostMapping("/categories/delete/{id}")
-    public String deleteCategory(@PathVariable Long id, RedirectAttributes redirectAttributes) {
-        // IMPORTANT: Check if the category is in use before deleting
-        long count = transactionRepository.countByCategory_Id(id); // You will need to add this method
-        if (count > 0) {
-            redirectAttributes.addFlashAttribute("errorMessage", "Cannot delete category as it is currently used by " + count + " transaction(s).");
-        } else {
-            categoryRepository.deleteById(id);
-            redirectAttributes.addFlashAttribute("successMessage", "Category deleted successfully.");
+        // Data for the "Add Category" form
+        if (!model.containsAttribute("newCategory")) {
+            model.addAttribute("newCategory", new Category());
         }
+        model.addAttribute("allAccounts", accountRepository.findAll());
+        model.addAttribute("transactionTypes", TransactionType.values());
+
+        return "categories";
+    }
+
+    @PostMapping("/add")
+    public String addCategory(@ModelAttribute("newCategory") Category newCategory,
+                              @RequestParam(value = "parentId", required = false) Long parentId) {
+        if (parentId != null) {
+            Category parent = categoryRepository.findById(parentId)
+                    .orElseThrow(() -> new IllegalArgumentException("Invalid parent category Id:" + parentId));
+            // A sub-category inherits its type and account from its parent
+            newCategory.setParentCategory(parent);
+            newCategory.setTransactionType(parent.getTransactionType());
+            newCategory.setDefaultAccount(parent.getDefaultAccount());
+        }
+        categoryRepository.save(newCategory);
+        return "redirect:/categories";
+    }
+
+    @PostMapping("/delete/{id}")
+    public String deleteCategory(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        long count = transactionRepository.countByCategory_Id(id);
+        if (count > 0) {
+            redirectAttributes.addFlashAttribute("errorMessage", "Cannot delete category: it is used by " + count + " transaction(s).");
+            return "redirect:/categories";
+        }
+
+        Category categoryToDelete = categoryRepository.findById(id).orElse(null);
+        if (categoryToDelete != null && !categoryToDelete.getSubCategories().isEmpty()) {
+            redirectAttributes.addFlashAttribute("errorMessage", "Cannot delete category: it has sub-categories. Please delete them first.");
+            return "redirect:/categories";
+        }
+
+        categoryRepository.deleteById(id);
+        redirectAttributes.addFlashAttribute("successMessage", "Category deleted successfully.");
         return "redirect:/categories";
     }
 }

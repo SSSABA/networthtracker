@@ -1,4 +1,4 @@
-package com.myworth.networthtracker;
+package com.myworth.networthtracker.dto;
 
 import java.util.List;
 

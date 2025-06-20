@@ -7,13 +7,18 @@
     body { font-family: sans-serif; margin: 2em; }
     .nav-bar { display: flex; gap: 15px; padding: 10px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; margin-bottom: 2em; }
     .nav-bar a { text-decoration: none; font-weight: bold; color: #007bff; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    th { background-color: #f2f2f2; }
-    .form-container { margin-top: 2em; padding: 1em; border: 1px solid #ccc; border-radius: 5px; }
+    .container { display: flex; gap: 2em; }
+    .category-list, .form-container { flex: 1; padding: 1em; border: 1px solid #ccc; border-radius: 8px; }
+    ul { list-style-type: none; padding-left: 20px; }
+    .parent-category { font-weight: bold; }
+    .sub-category { font-style: italic; }
+    .delete-form { display: inline-block; margin-left: 10px; }
     .btn { padding: 5px 10px; border-radius: 3px; border: none; cursor: pointer; color: white; }
     .btn-delete { background-color: #dc3545; }
-    .btn-submit { background-color: #007bff; }
+    .btn-submit { background-color: #007bff; margin-top: 10px; }
+    .form-group { margin-bottom: 1em; }
+    label { display: block; margin-bottom: 0.3em; }
+    input[type=text], select { width: 100%; padding: 8px; box-sizing: border-box; }
     .message { padding: 10px; margin-bottom: 15px; border-radius: 4px; }
     .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
@@ -24,45 +29,87 @@
 <nav class="nav-bar">
   <a th:href="@{/}">Dashboard</a>
   <a th:href="@{/transactions}">View Transactions</a>
-  <a th:href="@{/add-transactions}" style="color: #28a745;">Add Transactions</a>
+  <a th:href="@{/consolidated-entry}" style="color: #28a745;">Consolidated Entry</a>
   <a th:href="@{/categories}">Manage Categories</a>
 </nav>
 
 <h1>Manage Categories</h1>
 
+<!-- Display Error or Success Messages -->
 <div th:if="${errorMessage}" class="message error" th:text="${errorMessage}"></div>
 <div th:if="${successMessage}" class="message success" th:text="${successMessage}"></div>
 
-<div class="form-container">
-  <h2>Add New Category</h2>
-  <form th:action="@{/categories/add}" th:object="${newCategory}" method="post">
-    <input type="text" th:field="*{name}" placeholder="Enter new category name" required />
-    <button type="submit" class="btn btn-submit">Add Category</button>
-  </form>
+<div class="container">
+  <div class="category-list">
+    <h2>Existing Categories</h2>
+    <ul>
+      <li th:each="parent : ${parentCategories}">
+        <span class="parent-category" th:text="${parent.name} + ' (' + ${parent.transactionType} + ' -> ' + ${parent.defaultAccount.name} + ')'"></span>
+        <form th:action="@{/categories/delete/{id}(id=${parent.id})}" method="post" class="delete-form">
+          <button type="submit" class="btn btn-delete" onclick="return confirm('Are you sure? This will fail if it has sub-categories or transactions.');">Delete</button>
+        </form>
+        <ul>
+          <li th:each="child : ${parent.subCategories}">
+            <span class="sub-category" th:text="${child.name}"></span>
+            <form th:action="@{/categories/delete/{id}(id=${child.id})}" method="post" class="delete-form">
+              <button type="submit" class="btn btn-delete" onclick="return confirm('Are you sure?');">Delete</button>
+            </form>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+
+  <div class="form-container">
+    <h2>Add New Category</h2>
+    <form th:action="@{/categories/add}" th:object="${newCategory}" method="post">
+      <div class="form-group">
+        <label for="name">Name:</label>
+        <input type="text" th:field="*{name}" required />
+      </div>
+      <div class="form-group">
+        <label for="parentId">Parent Category (leave blank for top-level):</label>
+        <select id="parentId" name="parentId">
+          <option value="">-- TOP-LEVEL CATEGORY --</option>
+          <option th:each="p : ${parentCategories}" th:value="${p.id}" th:text="${p.name}"></option>
+        </select>
+      </div>
+      <div id="parent-only-fields">
+        <div class="form-group">
+          <label for="transactionType">Transaction Type (for top-level only):</label>
+          <select th:field="*{transactionType}">
+            <option value="">-- Select --</option>
+            <option th:each="t : ${transactionTypes}" th:value="${t}" th:text="${t.name()}"></option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="defaultAccount">Default Account (for top-level only):</label>
+          <select th:field="*{defaultAccount}">
+            <option value="">-- Select --</option>
+            <option th:each="a : ${allAccounts}" th:value="${a.id}" th:text="${a.name}"></option>
+          </select>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-submit">Save Category</button>
+    </form>
+  </div>
 </div>
 
-<h2>Existing Categories</h2>
-<table>
-  <thead>
-  <tr>
-    <th>ID</th>
-    <th>Name</th>
-    <th>Action</th>
-  </tr>
-  </thead>
-  <tbody>
-  <tr th:each="category : ${categories}">
-    <td th:text="${category.id}">1</td>
-    <td th:text="${category.name}">Groceries</td>
-    <td>
-      <form th:action="@{/categories/delete/{id}(id=${category.id})}" method="post">
-        <button type="submit" class="btn btn-delete"
-                th:onclick="return confirm('Are you sure you want to delete this category?');">Delete</button>
-      </form>
-    </td>
-  </tr>
-  </tbody>
-</table>
+<script>
+  // Script to hide/show fields based on whether it's a top-level category or a sub-category
+  const parentSelect = document.getElementById('parentId');
+  const parentOnlyFields = document.getElementById('parent-only-fields');
+
+  parentSelect.addEventListener('change', function() {
+    if (this.value) { // If a parent is selected
+      parentOnlyFields.style.display = 'none';
+    } else { // If no parent is selected (it's a top-level category)
+      parentOnlyFields.style.display = 'block';
+    }
+  });
+  // Trigger the change on page load as well
+  parentSelect.dispatchEvent(new Event('change'));
+</script>
 
 </body>
 </html>

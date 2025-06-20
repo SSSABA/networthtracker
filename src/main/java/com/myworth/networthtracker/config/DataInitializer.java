@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 @Component
 public class DataInitializer implements CommandLineRunner {
@@ -30,35 +31,38 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // STEP 1: Clear all existing data to ensure a fresh start.
-        // The order is important due to database relationships.
-        // We must delete the data that "depends on" other data first.
         transactionRepository.deleteAll();
-        accountRepository.deleteAll();
         categoryRepository.deleteAll();
+        accountRepository.deleteAll();
 
-        // STEP 2: Create the default Categories that you will use.
-        // You can add or remove any of these as you see fit.
-        categoryRepository.save(new Category("Salary"));
-        categoryRepository.save(new Category("Groceries"));
-        categoryRepository.save(new Category("Utilities"));
-        categoryRepository.save(new Category("Rent"));
-        categoryRepository.save(new Category("Dividends"));
-        categoryRepository.save(new Category("Dining Out"));
-        categoryRepository.save(new Category("Fuel"));
-        categoryRepository.save(new Category("Entertainment"));
-        categoryRepository.save(new Category("Shopping"));
+        // --- Create Accounts ---
+        Account checking = accountRepository.save(new Account("Checking Account", AccountType.ASSET));
+        Account savings = accountRepository.save(new Account("Savings Account", AccountType.ASSET));
+        Account investments = accountRepository.save(new Account("Investment Portfolio", AccountType.ASSET));
+        Account creditCard = accountRepository.save(new Account("Credit Card", AccountType.LIABILITY));
 
+        // --- Create Parent Categories ---
+        Category salary = categoryRepository.save(new Category("Salary", TransactionType.INCOME, checking));
+        Category investmentIncome = categoryRepository.save(new Category("Investment Income", TransactionType.INCOME, investments));
+        Category housing = categoryRepository.save(new Category("Housing", TransactionType.EXPENSE, checking));
+        Category groceries = categoryRepository.save(new Category("Groceries", TransactionType.EXPENSE, creditCard));
 
-        // STEP 3: Create the default Accounts.
-        // These are your primary asset and liability accounts.
-        accountRepository.save(new Account("Checking Account", AccountType.ASSET));
-        accountRepository.save(new Account("Savings Account", AccountType.ASSET));
-        accountRepository.save(new Account("Investment Portfolio", AccountType.ASSET));
-        accountRepository.save(new Account("Credit Card", AccountType.LIABILITY));
-        accountRepository.save(new Account("Personal Loan", AccountType.LIABILITY));
+        // --- Create Sub-Categories ---
+        Category paycheck = new Category("Paycheck", salary.getTransactionType(), salary.getDefaultAccount());
+        paycheck.setParentCategory(salary);
 
-        // STEP 4: Transaction seeding is now REMOVED.
-        // The transaction table will be empty on startup.
+        Category dividends = new Category("Dividends", investmentIncome.getTransactionType(), investmentIncome.getDefaultAccount());
+        dividends.setParentCategory(investmentIncome);
+
+        Category rent = new Category("Rent", housing.getTransactionType(), housing.getDefaultAccount());
+        rent.setParentCategory(housing);
+
+        Category costco = new Category("Costco", groceries.getTransactionType(), groceries.getDefaultAccount());
+        costco.setParentCategory(groceries);
+
+        Category wholeFoods = new Category("Whole Foods", groceries.getTransactionType(), groceries.getDefaultAccount());
+        wholeFoods.setParentCategory(groceries);
+
+        categoryRepository.saveAll(Set.of(paycheck, dividends, rent, costco, wholeFoods));
     }
 }

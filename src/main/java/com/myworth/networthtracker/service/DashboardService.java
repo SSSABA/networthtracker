@@ -1,6 +1,6 @@
 package com.myworth.networthtracker.service;
 
-import com.myworth.networthtracker.ChartData;
+import com.myworth.networthtracker.dto.ChartData;
 import com.myworth.networthtracker.enums.AccountType;
 import com.myworth.networthtracker.model.Transaction;
 import com.myworth.networthtracker.repository.AccountRepository;
@@ -12,7 +12,6 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
